@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3BLD Letter Pair Trainer</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Added a subtle pattern for visual interest */
+            background-color: #111827; /* bg-gray-900 */
+            background-image: radial-gradient(#374151 0.5px, transparent 0.5px);
+            background-size: 15px 15px;
+        }
+
+        /* Set base text color */
+        body {
+            color: #f3f4f6; /* text-gray-100 */
+        }
+        
+        /* Custom styles for the 3D flip card */
+        .card-container {
+            perspective: 1000px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .card-container.is-flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 0.5rem; /* rounded-lg */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            text-align: center; /* Added for better text wrapping */
+        }
+
+        .card-front {
+            background-color: #1f2937; /* bg-gray-800 */
+            border: 1px solid #374151; /* border-gray-700 */
+        }
+
+        .card-back {
+            background-color: #374151; /* bg-gray-700 */
+            border: 1px solid #4b5563; /* border-gray-600 */
+            transform: rotateY(180deg);
+        }
+
+        /* Style for the custom select dropdown */
+        .custom-select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        /* Style for disabled buttons */
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        button:disabled:hover {
+            transform: none;
+            /* Re-state base color to override hover */
+            background-color: revert; 
+        }
+        #btn-show-answer:disabled:hover {
+            background-color: #3b82f6; /* bg-blue-600 */
+        }
+        #btn-correct:disabled:hover {
+            background-color: #16a34a; /* bg-green-600 */
+        }
+        #btn-incorrect:disabled:hover {
+            background-color: #dc2626; /* bg-red-600 */
+        }
+
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen p-4 sm:p-8">
+
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <h1 class="text-3xl sm:text-4xl font-bold text-center text-cyan-400 mb-6">
+            3BLD Letter Pair Trainer
+        </h1>
+
+        <!-- Mode Switcher -->
+        <div class="flex justify-center gap-4 mb-6">
+            <button id="btn-train-mode" class="py-2 px-6 rounded-lg font-semibold transition-colors">
+                Train
+            </button>
+            <button id="btn-edit-mode" class="py-2 px-6 rounded-lg font-semibold transition-colors">
+                Edit
+            </button>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="app-content">
+
+            <!-- Train Mode View -->
+            <div id="train-view">
+                <!-- Session Stats -->
+                <div class="flex justify-around mb-4 text-lg bg-gray-800/50 backdrop-blur-sm p-4 rounded-lg shadow-md">
+                    <div class="text-center">
+                        <span class="text-gray-400 text-sm">CORRECT</span>
+                        <div id="correct-count" class="text-3xl font-bold text-green-400">0</div>
+                    </div>
+                    <div class="text-center">
+                        <span class="text-gray-400 text-sm">INCORRECT</span>
+                        <div id="incorrect-count" class="text-3xl font-bold text-red-400">0</div>
+                    </div>
+                </div>
+
+                <!-- Flashcard -->
+                <div id="card-container" class="card-container w-full h-52 sm:h-64">
+                    <div id="card-inner" class="card-inner">
+                        <!-- Front of Card (Letter Pair) -->
+                        <div class="card-face card-front">
+                            <span id="letter-pair" class="text-6xl sm:text-8xl font-black font-mono text-cyan-300"></span>
+                        </div>
+                        <!-- Back of Card (Mnemonic) -->
+                        <div class="card-face card-back">
+                            <span id="mnemonic-text" class="text-3xl sm:text-4xl font-semibold text-center"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Train Controls -->
+                <div class="mt-6 grid grid-cols-2 gap-4">
+                    <button id="btn-show-answer" class="col-span-2 py-3 px-6 rounded-lg text-white font-semibold shadow-md transition-transform transform hover:scale-105 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600">
+                        Show Mnemonic
+                    </button>
+                    <button id="btn-correct" class="py-3 px-6 rounded-lg text-white font-semibold shadow-md transition-transform transform hover:scale-105 bg-green-600 hover:bg-green-500 disabled:bg-green-600">
+                        Correct
+                    </button>
+                    <button id="btn-incorrect" class="py-3 px-6 rounded-lg text-white font-semibold shadow-md transition-transform transform hover:scale-105 bg-red-600 hover:bg-red-500 disabled:bg-red-600">
+                        Incorrect
+                    </button>
+                </div>
+            </div>
+
+            <!-- Edit Mode View (Hidden by default) -->
+            <div id="edit-view" class="hidden">
+                <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-200">Edit Your Mnemonics</h2>
+                    
+                    <!-- Letter Selector -->
+                    <div class="mb-4">
+                        <label for="letter-select" class="block text-sm font-medium text-gray-400 mb-2">Select First Letter (A-X):</label>
+                        <select id="letter-select" class="custom-select block w-full bg-gray-700 border border-gray-600 text-white rounded-md p-2 focus:ring-cyan-500 focus:border-cyan-500">
+                            <!-- Options will be generated by JS -->
+                        </select>
+                    </div>
+
+                    <!-- Mnemonic Input List -->
+                    <div id="mnemonic-list" class="space-y-3 max-h-96 overflow-y-auto pr-2">
+                        <!-- Inputs will be generated by JS -->
+                    </div>
+
+                    <!-- Save Button -->
+                    <button id="btn-save" class="mt-6 w-full py-3 px-6 rounded-lg text-white font-semibold shadow-md transition-transform transform hover:scale-105 bg-cyan-600 hover:bg-cyan-500">
+                        Save Mnemonics for this letter
+                    </button>
+                    <div id="save-feedback" class="text-center text-green-400 mt-2 h-4"></div>
+                </div>
+            </div>
+
+        </div> <!-- /#app-content -->
+    </div> <!-- /max-w-2xl -->
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE ---
+            const state = {
+                currentMode: 'train', // 'train' or 'edit'
+                mnemonics: {},      // Stores all user-defined pairs, e.g., {"AB": "Abacus"}
+                allPairs: [],       // Array of all "XX" pairs, e.g., ["AA", "AB", ...]
+                letters: "ABCDEFGHIJKLMNOPQRSTUVWX".split(''),
+                currentCard: { pair: '', mnemonic: '' },
+                isCardFlipped: false,
+                editLetter: 'A',
+                sessionStats: { correct: 0, incorrect: 0 }
+            };
+
+            // --- CONSTANTS ---
+            const MNEMONICS_KEY = 'bldMnemonics';
+
+            // --- DOM ELEMENTS ---
+            const btnTrainMode = document.getElementById('btn-train-mode');
+            const btnEditMode = document.getElementById('btn-edit-mode');
+            const trainView = document.getElementById('train-view');
+            const editView = document.getElementById('edit-view');
+            const letterPairText = document.getElementById('letter-pair');
+            const mnemonicText = document.getElementById('mnemonic-text');
+            const cardContainer = document.getElementById('card-container');
+            const btnShowAnswer = document.getElementById('btn-show-answer');
+            const btnCorrect = document.getElementById('btn-correct');
+            const btnIncorrect = document.getElementById('btn-incorrect');
+            const correctCount = document.getElementById('correct-count');
+            const incorrectCount = document.getElementById('incorrect-count');
+            const letterSelect = document.getElementById('letter-select');
+            const mnemonicList = document.getElementById('mnemonic-list');
+            const btnSave = document.getElementById('btn-save');
+            const saveFeedback = document.getElementById('save-feedback');
+
+            // --- FUNCTIONS ---
+
+            /**
+             * Initializes the application
+             */
+            function init() {
+                // 1. Generate all 576 letter pairs (A-X)
+                for (const l1 of state.letters) {
+                    for (const l2 of state.letters) {
+                        state.allPairs.push(l1 + l2);
+                    }
+                }
+
+                // 2. Load mnemonics from localStorage
+                loadMnemonics();
+
+                // 3. Populate Edit Mode dropdown
+                populateLetterSelect();
+
+                // 4. Set up initial UI
+                updateModeUI();
+                renderEditList();
+                getNextCard();
+
+                // 5. Attach event listeners
+                btnTrainMode.addEventListener('click', () => switchMode('train'));
+                btnEditMode.addEventListener('click', () => switchMode('edit'));
+                btnShowAnswer.addEventListener('click', flipCard);
+                btnCorrect.addEventListener('click', () => handleScore(true));
+                btnIncorrect.addEventListener('click', () => handleScore(false));
+                letterSelect.addEventListener('change', handleLetterSelectChange);
+                btnSave.addEventListener('click', saveCurrentLetterMnemonics);
+                cardContainer.addEventListener('click', flipCard);
+            }
+
+            /**
+             * Switches the view between 'train' and 'edit'
+             */
+            function switchMode(mode) {
+                state.currentMode = mode;
+                updateModeUI();
+            }
+
+            /**
+             * Updates the UI to show/hide views based on the current mode
+             */
+            function updateModeUI() {
+                if (state.currentMode === 'train') {
+                    trainView.style.display = 'block';
+                    editView.style.display = 'none';
+                    btnTrainMode.classList.add('bg-cyan-600', 'text-white');
+                    btnTrainMode.classList.remove('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+                    btnEditMode.classList.add('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+                    btnEditMode.classList.remove('bg-cyan-600', 'text-white');
+                    // Refresh the card when switching back to train mode
+                    getNextCard();
+                } else {
+                    trainView.style.display = 'none';
+                    editView.style.display = 'block';
+                    btnTrainMode.classList.add('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+                    btnTrainMode.classList.remove('bg-cyan-600', 'text-white');
+                    btnEditMode.classList.add('bg-cyan-600', 'text-white');
+                    btnEditMode.classList.remove('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+                }
+            }
+
+            /**
+             * Populates the letter select dropdown in Edit mode
+             */
+            function populateLetterSelect() {
+                state.letters.forEach(letter => {
+                    const option = document.createElement('option');
+                    option.value = letter;
+                    option.textContent = letter;
+                    letterSelect.appendChild(option);
+                });
+                letterSelect.value = state.editLetter;
+            }
+
+            /**
+             * Renders the list of 24 input fields for the currently selected edit letter
+             */
+            function renderEditList() {
+                mnemonicList.innerHTML = ''; // Clear existing list
+                const pairsForLetter = state.allPairs.filter(p => p.startsWith(state.editLetter));
+
+                pairsForLetter.forEach(pair => {
+                    const savedMnemonic = state.mnemonics[pair] || '';
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center gap-4';
+                    
+                    row.innerHTML = `
+                        <label for="pair-${pair}" class="w-1/6 flex-shrink-0 font-mono text-xl text-gray-300">${pair}</label>
+                        <input type="text" id="pair-${pair}" data-pair="${pair}" value="${savedMnemonic}" class="mnemonic-input flex-1 bg-gray-700 border border-gray-600 text-white rounded-md p-2 focus:ring-cyan-500 focus:border-cyan-500" placeholder="Your image/word...">
+                    `;
+                    mnemonicList.appendChild(row);
+                });
+            }
+
+            /**
+             * Handles the 'change' event on the letter select dropdown
+             */
+            function handleLetterSelectChange(e) {
+                state.editLetter = e.target.value;
+                btnSave.textContent = `Save Mnemonics for "${state.editLetter}"`;
+                renderEditList();
+            }
+
+            /**
+             * Saves the 24 mnemonics for the current edit letter
+             */
+            function saveCurrentLetterMnemonics() {
+                const inputs = mnemonicList.querySelectorAll('.mnemonic-input');
+                inputs.forEach(input => {
+                    const pair = input.dataset.pair;
+                    const value = input.value.trim();
+                    if (value) {
+                        state.mnemonics[pair] = value;
+                    } else {
+                        // If user clears an input, remove it from the object
+                        delete state.mnemonics[pair];
+                    }
+                });
+
+                // Save the entire mnemonics object to localStorage
+                localStorage.setItem(MNEMONICS_KEY, JSON.stringify(state.mnemonics));
+
+                // Show feedback
+                saveFeedback.textContent = 'Saved!';
+                setTimeout(() => {
+                    saveFeedback.textContent = '';
+                }, 2000);
+            }
+
+            /**
+             * Loads all mnemonics from localStorage into the state
+             */
+            function loadMnemonics() {
+                const savedData = localStorage.getItem(MNEMONICS_KEY);
+                if (savedData) {
+                    state.mnemonics = JSON.parse(savedData);
+                } else {
+                    state.mnemonics = {};
+                }
+            }
+
+            /**
+             * Gets a new random card *from the saved mnemonics* and updates the training UI
+             */
+            function getNextCard() {
+                // Get a list of only the pairs that have saved mnemonics
+                const savedPairs = Object.keys(state.mnemonics);
+
+                if (savedPairs.length === 0) {
+                    // Show a helpful message if no mnemonics are saved
+                    state.currentCard = { pair: '👋', mnemonic: "Add mnemonics in the 'Edit' tab to start training!" };
+                    state.isCardFlipped = false; // Show the pair (emoji) side
+                    renderCard();
+                    // Disable scoring buttons if no cards
+                    btnShowAnswer.disabled = true;
+                    btnCorrect.disabled = true;
+                    btnIncorrect.disabled = true;
+                    return;
+                }
+
+                // Enable scoring buttons
+                btnShowAnswer.disabled = false;
+                btnCorrect.disabled = false;
+                btnIncorrect.disabled = false;
+
+                // Select a random pair *from the saved list*
+                const randomIndex = Math.floor(Math.random() * savedPairs.length);
+                const randomPair = savedPairs[randomIndex];
+                const mnemonic = state.mnemonics[randomPair]; // We know this exists
+                
+                state.currentCard = { pair: randomPair, mnemonic: mnemonic };
+                state.isCardFlipped = false;
+
+                renderCard();
+            }
+
+            /**
+             * Updates the card UI based on the current state
+             */
+            function renderCard() {
+                letterPairText.textContent = state.currentCard.pair;
+                mnemonicText.textContent = state.currentCard.mnemonic;
+                
+                if (state.isCardFlipped) {
+                    cardContainer.classList.add('is-flipped');
+                    btnShowAnswer.textContent = 'Show Letter Pair';
+                } else {
+                    cardContainer.classList.remove('is-flipped');
+                    btnShowAnswer.textContent = 'Show Mnemonic';
+                }
+            }
+
+            /**
+             * Toggles the card flip state
+             */
+            function flipCard() {
+                // Don't flip if buttons are disabled (i.e., no cards)
+                if(btnShowAnswer.disabled) return;
+                
+                state.isCardFlipped = !state.isCardFlipped;
+                renderCard();
+            }
+
+            /**
+             * Handles scoring a card (correct/incorrect)
+             */
+            function handleScore(isCorrect) {
+                if (isCorrect) {
+                    state.sessionStats.correct++;
+                } else {
+                    state.sessionStats.incorrect++;
+                }
+                updateStatsUI();
+                getNextCard();
+            }
+
+            /**
+             * Updates the stats display
+             */
+            function updateStatsUI() {
+                correctCount.textContent = state.sessionStats.correct;
+                incorrectCount.textContent = state.sessionStats.incorrect;
+            }
+
+            // --- START THE APP ---
+            init();
+        });
+    </script>
+
+</body>
+</html>
+
