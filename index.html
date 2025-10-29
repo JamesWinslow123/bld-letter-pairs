@@ -249,7 +249,12 @@
                 isCardFlipped: false,
                 editLetter: 'A',
                 sessionStats: { correct: 0, incorrect: 0 },
-                lastPair: null, // Stores the last pair shown to prevent immediate repetition
+                
+                // NEW: Deck Management for fair, sequential practice
+                shuffledDeck: [],   // The array of pairs in the current random order
+                deckIndex: 0,       // Current position in the shuffledDeck
+                lastPair: null,     // Stores the last pair shown to prevent immediate repetition across deck transitions
+                
                 trainFilterLetter: 'ALL', // Default to practice all letters
             };
 
@@ -282,6 +287,54 @@
             const btnImport = document.getElementById('btn-import');
             const importFeedback = document.getElementById('import-feedback');
 
+            // --- DECK UTILITY ---
+            /**
+             * Shuffles an array in place using the Fisher-Yates (Knuth) algorithm.
+             * @param {Array} array 
+             * @returns {Array} The shuffled array.
+             */
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            /**
+             * Generates and shuffles a new deck based on the current filter settings.
+             */
+            function generateShuffledDeck() {
+                // 1. Determine base pairs (only saved ones)
+                let filteredPairs = Object.keys(state.mnemonics);
+
+                // 2. Apply filter
+                if (state.trainFilterLetter !== 'ALL') {
+                    filteredPairs = filteredPairs.filter(pair => pair.startsWith(state.trainFilterLetter));
+                }
+
+                if (filteredPairs.length === 0) {
+                    state.shuffledDeck = [];
+                    state.deckIndex = 0;
+                    return;
+                }
+                
+                // 3. Shuffle the array (using a copy to avoid mutating the original keys)
+                let newDeck = shuffleArray([...filteredPairs]); 
+                
+                // 4. Repetition Check for Deck Transition (if deck length > 1)
+                // Prevents the first card of the new deck from being the same as the last card of the previous deck.
+                if (newDeck.length > 1 && state.lastPair && newDeck[0] === state.lastPair) {
+                    // Swap the first card with a random card (other than the first)
+                    const swapIndex = 1 + Math.floor(Math.random() * (newDeck.length - 1));
+                    [newDeck[0], newDeck[swapIndex]] = [newDeck[swapIndex], newDeck[0]];
+                }
+
+                state.shuffledDeck = newDeck;
+                state.deckIndex = 0;
+            }
+
+
             // --- FUNCTIONS ---
 
             /**
@@ -297,17 +350,20 @@
 
                 // 2. Load mnemonics from localStorage
                 loadMnemonics();
+                
+                // 3. Initialize the first shuffled deck
+                generateShuffledDeck();
 
-                // 3. Populate Edit Mode dropdown and Train Filter dropdown
+                // 4. Populate Edit Mode dropdown and Train Filter dropdown
                 populateLetterSelect();
                 populateTrainFilterSelect(); 
 
-                // 4. Set up initial UI
+                // 5. Set up initial UI
                 updateModeUI();
                 renderEditList();
                 getNextCard();
 
-                // 5. Attach event listeners
+                // 6. Attach event listeners
                 btnTrainMode.addEventListener('click', () => switchMode('train'));
                 btnEditMode.addEventListener('click', () => switchMode('edit'));
                 btnShowAnswer.addEventListener('click', flipCard);
@@ -346,13 +402,10 @@
                     btnTrainMode.classList.remove('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
                     btnEditMode.classList.add('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
                     btnEditMode.classList.remove('bg-cyan-600', 'text-white');
-                    // Refresh the card when switching back to train mode
-                    if (Object.keys(state.mnemonics).length > 0) {
-                        getNextCard();
-                    } else {
-                        // If no cards, ensure the prompt is visible
-                        getNextCard(false); 
-                    }
+                    
+                    // Always try to load the next card when entering train mode
+                    // This will generate a deck if necessary.
+                    getNextCard(); 
 
                 } else {
                     trainView.style.display = 'none';
@@ -402,8 +455,8 @@
              */
             function handleTrainFilterChange(e) {
                 state.trainFilterLetter = e.target.value;
-                // Reset lastPair when changing filter so the first card is random within the new set
-                state.lastPair = null; 
+                // Generate a new deck immediately upon filter change
+                generateShuffledDeck(); 
                 getNextCard();
             }
 
@@ -475,78 +528,58 @@
             }
 
             /**
-             * Gets a new random card *from the saved mnemonics* and updates the training UI
+             * Gets the next card from the shuffled deck and updates the training UI.
              */
             function getNextCard() {
-                // Get a list of only the pairs that have saved mnemonics
-                let savedPairs = Object.keys(state.mnemonics);
+                // 1. Check if the deck is empty or exhausted
+                if (state.shuffledDeck.length === 0 || state.deckIndex >= state.shuffledDeck.length) {
+                    
+                    // If no mnemonics are saved at all, show the setup message
+                    if (Object.keys(state.mnemonics).length === 0) {
+                        state.currentCard = { pair: '👋', mnemonic: "Add mnemonics in the 'Edit' tab to start training!" };
+                        btnShowAnswer.disabled = true;
+                        btnCorrect.disabled = true;
+                        btnIncorrect.disabled = true;
+                        state.lastPair = null; 
+                        state.isCardFlipped = false;
+                        renderCard();
+                        return;
+                    }
+                    
+                    // Generate a new deck if we ran out or if this is the first time loading
+                    generateShuffledDeck();
 
-                if (savedPairs.length === 0) {
-                    // Show a helpful message if no mnemonics are saved
-                    state.currentCard = { pair: '👋', mnemonic: "Add mnemonics in the 'Edit' tab to start training!" };
-                    state.isCardFlipped = false;
-                    renderCard();
-                    // Disable scoring buttons if no cards
-                    btnShowAnswer.disabled = true;
-                    btnCorrect.disabled = true;
-                    btnIncorrect.disabled = true;
-                    state.lastPair = null; // Reset lastPair when no cards are available
-                    return;
-                }
-                
-                // --- Apply Training Filter ---
-                if (state.trainFilterLetter !== 'ALL') {
-                    savedPairs = savedPairs.filter(pair => pair.startsWith(state.trainFilterLetter));
-                }
-                
-                // Check if the filter resulted in an empty set
-                if (savedPairs.length === 0) {
-                     // If the filtered set is empty, show a message
-                    state.currentCard = { 
-                        pair: 'Empty', 
-                        mnemonic: `No mnemonics saved for pairs starting with ${state.trainFilterLetter}.` 
-                    };
-                    state.isCardFlipped = false;
-                    renderCard();
-                    btnShowAnswer.disabled = true;
-                    btnCorrect.disabled = true;
-                    btnIncorrect.disabled = true;
-                    state.lastPair = null; 
-                    return;
-                }
-                // --- End Apply Training Filter ---
-
-                // --- Logic to prevent immediate repetition ---
-                let availablePairs = savedPairs;
-                
-                // If there is more than one card saved in the current *filtered* set, and we have a previous card, filter it out.
-                if (savedPairs.length > 1 && state.lastPair) {
-                    // Only filter if the last pair is actually in the current filtered set
-                    if (savedPairs.includes(state.lastPair)) {
-                        availablePairs = savedPairs.filter(pair => pair !== state.lastPair);
+                    // If after generation, the deck is still empty (due to filter), show message
+                    if (state.shuffledDeck.length === 0) {
+                        state.currentCard = { 
+                            pair: 'Empty', 
+                            mnemonic: `No mnemonics saved for pairs starting with ${state.trainFilterLetter}.` 
+                        };
+                        btnShowAnswer.disabled = true;
+                        btnCorrect.disabled = true;
+                        btnIncorrect.disabled = true;
+                        state.lastPair = null; 
+                        state.isCardFlipped = false;
+                        renderCard();
+                        return;
                     }
                 }
-                
-                // If the filtered list is empty (only happens if the filtered set had 1 card), fall back to the full filtered set.
-                if (availablePairs.length === 0) {
-                     availablePairs = savedPairs;
-                }
-                // --- END Repetition Logic ---
 
+                // 2. Retrieve the next card from the shuffled deck
+                const randomPair = state.shuffledDeck[state.deckIndex];
+                state.deckIndex++; // Increment index for the next call
+                
+                const mnemonic = state.mnemonics[randomPair]; 
+                
+                // 3. Update the state and UI
+                state.currentCard = { pair: randomPair, mnemonic: mnemonic };
+                state.isCardFlipped = false; // Always start a new card unflipped
+                state.lastPair = randomPair; // Store the current pair as the last pair
+                
                 // Enable scoring buttons
                 btnShowAnswer.disabled = false;
                 btnCorrect.disabled = false;
                 btnIncorrect.disabled = false;
-
-                // Select a random pair *from the available list*
-                const randomIndex = Math.floor(Math.random() * availablePairs.length);
-                const randomPair = availablePairs[randomIndex];
-                const mnemonic = state.mnemonics[randomPair]; 
-                
-                // Update the state
-                state.currentCard = { pair: randomPair, mnemonic: mnemonic };
-                state.isCardFlipped = false; // Always start a new card unflipped
-                state.lastPair = randomPair; // Store the current pair as the last pair for the next round
 
                 renderCard();
             }
@@ -610,7 +643,6 @@
                     btnShowAnswer.textContent = 'Show Mnemonic';
                     
                     // Step C: Wait for the 0.6s transition before loading the new content
-                    // This prevents the new mnemonic from flashing.
                     setTimeout(updateAndLoadNextCard, FLIP_DURATION_MS);
                 } else {
                     // If card is already showing the letter pair (user scored before checking answer), load new content immediately
@@ -698,8 +730,9 @@
                         state.mnemonics = newMnemonics;
                         localStorage.setItem(MNEMONICS_KEY, JSON.stringify(state.mnemonics));
                         
-                        // Update UI
+                        // Update UI and create a new shuffled deck
                         renderEditList(); 
+                        generateShuffledDeck(); // Important: Regenerate the deck after importing new data
                         importFeedback.textContent = `✅ Successfully imported ${count} mnemonic pairs!`;
                         
                         // If we are in train mode, load the first card with new data
@@ -710,10 +743,10 @@
                         importFeedback.textContent = '❌ Error: No valid pairs found in file. Ensure format is PAIR: Mnemonic';
                     }
 
-                    // Reset file input and button state (Crucial to do this on both success/failure paths)
+                    // Reset file input and button state
                     fileUpload.value = '';
                     btnImport.disabled = true;
-                    // *** Removed the setTimeout here, so the message remains visible ***
+                    // The error/success message persists until the next file upload attempt.
                 };
                 
                 reader.onerror = () => {
@@ -723,7 +756,6 @@
                     // Reset file input and button state
                     fileUpload.value = '';
                     btnImport.disabled = true;
-                    // *** Removed the setTimeout here, so the message remains visible ***
                 };
                 
                 reader.readAsText(file);
