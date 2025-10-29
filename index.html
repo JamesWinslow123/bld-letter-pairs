@@ -663,7 +663,9 @@
              * This function REPLACES all existing mnemonics.
              */
             function importMnemonics(file) {
-                importFeedback.textContent = 'Importing...';
+                // Clear previous message immediately upon new attempt
+                importFeedback.textContent = 'Importing...'; 
+                
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const text = e.target.result;
@@ -692,30 +694,38 @@
                     });
 
                     if (count > 0) {
-                        // Replace ALL existing mnemonics
+                        // Success path
                         state.mnemonics = newMnemonics;
                         localStorage.setItem(MNEMONICS_KEY, JSON.stringify(state.mnemonics));
                         
                         // Update UI
                         renderEditList(); 
                         importFeedback.textContent = `✅ Successfully imported ${count} mnemonic pairs!`;
+                        
+                        // If we are in train mode, load the first card with new data
+                        if (state.currentMode === 'train') getNextCard();
+                        
                     } else {
+                        // Error path (no valid pairs)
                         importFeedback.textContent = '❌ Error: No valid pairs found in file. Ensure format is PAIR: Mnemonic';
                     }
 
+                    // Reset file input and button state (Crucial to do this on both success/failure paths)
+                    fileUpload.value = '';
+                    btnImport.disabled = true;
+                    // *** Removed the setTimeout here, so the message remains visible ***
+                };
+                
+                reader.onerror = () => {
+                    // File reading error path
+                    importFeedback.textContent = '❌ Error reading file.';
+                    
                     // Reset file input and button state
                     fileUpload.value = '';
                     btnImport.disabled = true;
-                    setTimeout(() => { 
-                        importFeedback.textContent = ''; 
-                        // If we are in train mode, load the first card with new data
-                        if (state.currentMode === 'train') getNextCard();
-                    }, 4000);
+                    // *** Removed the setTimeout here, so the message remains visible ***
                 };
-                reader.onerror = () => {
-                    importFeedback.textContent = '❌ Error reading file.';
-                    setTimeout(() => { importFeedback.textContent = ''; }, 4000);
-                };
+                
                 reader.readAsText(file);
             }
 
