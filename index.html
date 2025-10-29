@@ -4,12 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3BLD Letter Pair Trainer</title>
+    
+    <!-- FAVICON: Embedded SVG of a 3D-style blue cube -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3C!-- Main Blue Face --%3E%3Cpolygon points='10 20 90 20 90 80 10 80' fill='%2306B6D4'/%3E%3C!-- Left Shadow --%3E%3Cpolygon points='10 20 40 5 40 65 10 80' fill='%230891B2'/%3E%3C!-- Top Highlight --%3E%3Cpolygon points='10 20 90 20 60 5 40 5' fill='%2322D3EE'/%3E%3C!-- Letter B for BLD --%3E%3Ctext x='50' y='65' font-size='50' font-family='sans-serif' fill='white' text-anchor='middle' font-weight='bold'%3EB%3C/text%3E%3C/svg%3E">
+    
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -99,6 +103,11 @@
             background-color: #dc2626; /* bg-red-600 */
         }
 
+        /* Styling for the file input */
+        #file-upload::file-selector-button {
+            cursor: pointer;
+        }
+
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen p-4 sm:p-8">
@@ -136,7 +145,7 @@
                     </div>
                 </div>
 
-                <!-- NEW: Training Filter Selector -->
+                <!-- Training Filter Selector -->
                 <div class="mb-4">
                     <label for="train-letter-filter" class="block text-sm font-medium text-gray-400 mb-2">Focus Letter (First Letter of Pair):</label>
                     <select id="train-letter-filter" class="custom-select block w-full bg-gray-700 border border-gray-600 text-white rounded-md p-2 focus:ring-cyan-500 focus:border-cyan-500">
@@ -195,6 +204,33 @@
                         Save Mnemonics for this letter
                     </button>
                     <div id="save-feedback" class="text-center text-green-400 mt-2 h-4"></div>
+
+                    <!-- Import/Export Section -->
+                    <div class="mt-6 border-t border-gray-700 pt-6">
+                        <h3 class="text-lg font-semibold mb-3 text-gray-300">Import / Export</h3>
+
+                        <!-- Export -->
+                        <button id="btn-export" class="w-full py-2 px-4 rounded-lg text-white font-semibold transition-colors bg-teal-600 hover:bg-teal-500 mb-4 shadow-md transition-transform transform hover:scale-[1.02]">
+                            Export Mnemonics to TXT
+                        </button>
+
+                        <!-- Import -->
+                        <label class="block text-sm font-medium text-gray-400 mb-2" for="file-upload">Import from TXT (Replaces all existing data):</label>
+                        <div class="flex flex-col sm:flex-row gap-2 items-start">
+                            <input type="file" id="file-upload" accept=".txt" class="flex-1 block w-full text-sm text-gray-400
+                                file:mr-4 file:py-2 file:px-4 file:cursor-pointer
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-gray-700 file:text-cyan-400
+                                hover:file:bg-gray-600
+                            "/>
+                            <button id="btn-import" class="w-full sm:w-auto py-2 px-4 rounded-lg text-white font-semibold transition-colors bg-purple-600 hover:bg-purple-500 disabled:opacity-50 shadow-md" disabled>
+                                Import
+                            </button>
+                        </div>
+                        <div id="import-feedback" class="text-center text-yellow-400 mt-2 h-4"></div>
+                    </div>
+
                 </div>
             </div>
 
@@ -214,7 +250,7 @@
                 editLetter: 'A',
                 sessionStats: { correct: 0, incorrect: 0 },
                 lastPair: null, // Stores the last pair shown to prevent immediate repetition
-                trainFilterLetter: 'ALL', // NEW: Default to practice all letters
+                trainFilterLetter: 'ALL', // Default to practice all letters
             };
 
             // --- CONSTANTS ---
@@ -238,7 +274,13 @@
             const mnemonicList = document.getElementById('mnemonic-list');
             const btnSave = document.getElementById('btn-save');
             const saveFeedback = document.getElementById('save-feedback');
-            const trainLetterFilter = document.getElementById('train-letter-filter'); // NEW
+            const trainLetterFilter = document.getElementById('train-letter-filter'); 
+
+            // NEW Import/Export Elements
+            const btnExport = document.getElementById('btn-export');
+            const fileUpload = document.getElementById('file-upload');
+            const btnImport = document.getElementById('btn-import');
+            const importFeedback = document.getElementById('import-feedback');
 
             // --- FUNCTIONS ---
 
@@ -256,9 +298,9 @@
                 // 2. Load mnemonics from localStorage
                 loadMnemonics();
 
-                // 3. Populate Edit Mode dropdown and NEW Train Filter dropdown
+                // 3. Populate Edit Mode dropdown and Train Filter dropdown
                 populateLetterSelect();
-                populateTrainFilterSelect(); // NEW
+                populateTrainFilterSelect(); 
 
                 // 4. Set up initial UI
                 updateModeUI();
@@ -272,9 +314,17 @@
                 btnCorrect.addEventListener('click', () => handleScore(true));
                 btnIncorrect.addEventListener('click', () => handleScore(false));
                 letterSelect.addEventListener('change', handleLetterSelectChange);
-                trainLetterFilter.addEventListener('change', handleTrainFilterChange); // NEW
+                trainLetterFilter.addEventListener('change', handleTrainFilterChange); 
                 btnSave.addEventListener('click', saveCurrentLetterMnemonics);
                 cardContainer.addEventListener('click', flipCard);
+                
+                // Import/Export Listeners
+                btnExport.addEventListener('click', exportMnemonics);
+                fileUpload.addEventListener('change', () => {
+                    // Enable import button only if a file is selected
+                    btnImport.disabled = fileUpload.files.length === 0;
+                });
+                btnImport.addEventListener('click', handleImport);
             }
 
             /**
@@ -574,6 +624,99 @@
             function updateStatsUI() {
                 correctCount.textContent = state.sessionStats.correct;
                 incorrectCount.textContent = state.sessionStats.incorrect;
+            }
+
+            /**
+             * Exports all mnemonics to a downloadable .txt file.
+             */
+            function exportMnemonics() {
+                // Format: PAIR: MNEMONIC (one per line)
+                const textContent = Object.entries(state.mnemonics)
+                    // Sort alphabetically by pair for clean file structure
+                    .sort((a, b) => a[0].localeCompare(b[0])) 
+                    .map(([pair, mnemonic]) => `${pair}: ${mnemonic}`)
+                    .join('\n');
+
+                const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '3bld_mnemonics.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            /**
+             * Handles the import button click and reads the selected file.
+             */
+            function handleImport() {
+                const file = fileUpload.files[0];
+                if (file) {
+                    importMnemonics(file);
+                }
+            }
+
+            /**
+             * Reads and parses the .txt file content to update mnemonics.
+             * This function REPLACES all existing mnemonics.
+             */
+            function importMnemonics(file) {
+                importFeedback.textContent = 'Importing...';
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target.result;
+                    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                    const newMnemonics = {};
+                    let count = 0;
+                    const validLetters = new Set(state.letters);
+
+                    lines.forEach(line => {
+                        // Split only on the first colon (:) to allow mnemonics to contain colons
+                        const parts = line.split(/:\s*/, 2); 
+                        if (parts.length === 2) {
+                            const pair = parts[0].trim().toUpperCase();
+                            const mnemonic = parts[1].trim();
+
+                            // Basic validation: pair must be 2 letters from A-X
+                            if (pair.length === 2 && 
+                                validLetters.has(pair[0]) && 
+                                validLetters.has(pair[1]) && 
+                                mnemonic.length > 0) {
+                                
+                                newMnemonics[pair] = mnemonic;
+                                count++;
+                            }
+                        }
+                    });
+
+                    if (count > 0) {
+                        // Replace ALL existing mnemonics
+                        state.mnemonics = newMnemonics;
+                        localStorage.setItem(MNEMONICS_KEY, JSON.stringify(state.mnemonics));
+                        
+                        // Update UI
+                        renderEditList(); 
+                        importFeedback.textContent = `✅ Successfully imported ${count} mnemonic pairs!`;
+                    } else {
+                        importFeedback.textContent = '❌ Error: No valid pairs found in file. Ensure format is PAIR: Mnemonic';
+                    }
+
+                    // Reset file input and button state
+                    fileUpload.value = '';
+                    btnImport.disabled = true;
+                    setTimeout(() => { 
+                        importFeedback.textContent = ''; 
+                        // If we are in train mode, load the first card with new data
+                        if (state.currentMode === 'train') getNextCard();
+                    }, 4000);
+                };
+                reader.onerror = () => {
+                    importFeedback.textContent = '❌ Error reading file.';
+                    setTimeout(() => { importFeedback.textContent = ''; }, 4000);
+                };
+                reader.readAsText(file);
             }
 
             // --- START THE APP ---
